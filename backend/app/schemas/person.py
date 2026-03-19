@@ -51,6 +51,16 @@ class AbilityDimensionCreate(AbilityDimensionBase):
     pass
 
 
+class AbilityDimensionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    level_1_desc: Optional[str] = None
+    level_2_desc: Optional[str] = None
+    level_3_desc: Optional[str] = None
+    level_4_desc: Optional[str] = None
+    level_5_desc: Optional[str] = None
+
+
 class AbilityDimensionResponse(AbilityDimensionBase):
     id: str
     created_at: datetime

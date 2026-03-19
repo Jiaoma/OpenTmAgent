@@ -9,8 +9,8 @@ from app.models import (
     TaskStatus, TaskRelationType, Person
 )
 from app.schemas import (
-    VersionCreate, VersionResponse, VersionDetailResponse,
-    IterationCreate, IterationResponse, IterationDetailResponse,
+    VersionCreate, VersionUpdate, VersionResponse, VersionDetailResponse,
+    IterationCreate, IterationUpdate, IterationResponse, IterationDetailResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskDetailResponse,
     TaskGraphResponse, TaskGraphNode, TaskGraphEdge,
     CriticalPathResponse, MaxLoadPersonResponse,
@@ -50,6 +50,25 @@ async def get_version(version_id: str, db: Session = Depends(get_db)):
         **{c.name: getattr(version, c.name) for c in version.__table__.columns},
         iterations=iterations
     )
+
+
+@router.put("/versions/{version_id}", response_model=VersionResponse)
+async def update_version(
+    version_id: str,
+    version: VersionUpdate,
+    db: Session = Depends(get_db)
+):
+    db_version = db.query(Version).filter(Version.id == version_id).first()
+    if not db_version:
+        raise HTTPException(status_code=404, detail="版本不存在")
+    
+    update_data = version.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_version, key, value)
+    
+    db.commit()
+    db.refresh(db_version)
+    return db_version
 
 
 @router.delete("/versions/{version_id}")
@@ -95,6 +114,25 @@ async def get_iteration(iteration_id: str, db: Session = Depends(get_db)):
         **{c.name: getattr(iteration, c.name) for c in iteration.__table__.columns},
         tasks=tasks
     )
+
+
+@router.put("/iterations/{iteration_id}", response_model=IterationResponse)
+async def update_iteration(
+    iteration_id: str,
+    iteration: IterationUpdate,
+    db: Session = Depends(get_db)
+):
+    db_iteration = db.query(Iteration).filter(Iteration.id == iteration_id).first()
+    if not db_iteration:
+        raise HTTPException(status_code=404, detail="迭代不存在")
+    
+    update_data = iteration.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_iteration, key, value)
+    
+    db.commit()
+    db.refresh(db_iteration)
+    return db_iteration
 
 
 @router.post("/tasks", response_model=TaskResponse)
@@ -163,10 +201,23 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/tasks", response_model=List[TaskResponse])
-async def list_tasks(iteration_id: str = None, db: Session = Depends(get_db)):
+async def list_tasks(
+    iteration_id: str = None,
+    search: str = None,
+    status: str = None,
+    db: Session = Depends(get_db)
+):
     query = db.query(Task)
+    
     if iteration_id:
         query = query.filter(Task.iteration_id == iteration_id)
+    
+    if search:
+        query = query.filter(Task.name.ilike(f"%{search}%"))
+    
+    if status:
+        query = query.filter(Task.status == status)
+    
     return query.all()
 
 
@@ -385,3 +436,75 @@ async def get_completion_stats(
         iteration_id=iteration_id,
         stats=stats
     )
+
+
+@router.get("/tasks/graph/mermaid")
+async def export_task_graph_mermaid(
+    iteration_ids: str,
+    db: Session = Depends(get_db)
+):
+    ids = iteration_ids.split(",")
+    tasks = db.query(Task).filter(Task.iteration_id.in_(ids)).all()
+    
+    lines = ["graph TD"]
+    
+    for task in tasks:
+        status_color = {
+            "pending": "#909399",
+            "in_progress": "#409EFF",
+            "completed": "#67C23A"
+        }.get(task.status, "#909399")
+        lines.append(f"    {task.id}[{task.name}]:::{task.status.value}")
+    
+    for task in tasks:
+        for dep in task.dependencies:
+            if dep.relation_type == TaskRelationType.DEPENDS_ON:
+                lines.append(f"    {dep.related_task_id} --> {task.id}")
+            else:
+                lines.append(f"    {dep.related_task_id} -.-> {task.id}")
+    
+    lines.append("")
+    lines.append("    classDef pending fill:#909399")
+    lines.append("    classDef in_progress fill:#409EFF")
+    lines.append("    classDef completed fill:#67C23A")
+    
+    return {"mermaid_code": "\n".join(lines)}
+
+
+@router.get("/tasks/gantt/mermaid")
+async def export_gantt_mermaid(
+    iteration_id: str,
+    db: Session = Depends(get_db)
+):
+    iteration = db.query(Iteration).filter(Iteration.id == iteration_id).first()
+    if not iteration:
+        raise HTTPException(status_code=404, detail="迭代不存在")
+    
+    tasks = db.query(Task).filter(Task.iteration_id == iteration_id).all()
+    
+    lines = ["gantt"]
+    lines.append("    title 任务甘特图")
+    lines.append("    dateFormat  YYYY-MM-DD")
+    lines.append("    axisFormat  %m/%d")
+    lines.append("")
+    
+    pending_tasks = [t for t in tasks if t.status == TaskStatus.PENDING]
+    in_progress_tasks = [t for t in tasks if t.status == TaskStatus.IN_PROGRESS]
+    completed_tasks = [t for t in tasks if t.status == TaskStatus.COMPLETED]
+    
+    if pending_tasks:
+        lines.append("    section 待处理")
+        for task in pending_tasks:
+            lines.append(f"    {task.name}           :{task.id}, {task.start_date}, {task.end_date}")
+    
+    if in_progress_tasks:
+        lines.append("    section 进行中")
+        for task in in_progress_tasks:
+            lines.append(f"    {task.name}           :active, {task.id}, {task.start_date}, {task.end_date}")
+    
+    if completed_tasks:
+        lines.append("    section 已完成")
+        for task in completed_tasks:
+            lines.append(f"    {task.name}           :done, {task.id}, {task.start_date}, {task.end_date}")
+    
+    return {"mermaid_code": "\n".join(lines)}

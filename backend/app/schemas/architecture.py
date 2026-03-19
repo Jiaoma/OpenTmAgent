@@ -12,6 +12,11 @@ class ModuleCreate(ModuleBase):
     pass
 
 
+class ModuleUpdate(BaseModel):
+    name: Optional[str] = None
+    parent_id: Optional[str] = None
+
+
 class ModuleResponse(ModuleBase):
     id: str
     created_at: datetime
@@ -32,6 +37,15 @@ class FeatureBase(BaseModel):
 
 class FeatureCreate(FeatureBase):
     dependent_module_ids: List[str] = []
+
+
+class FeatureUpdate(BaseModel):
+    name: Optional[str] = None
+    parent_id: Optional[str] = None
+
+
+class FeatureModulesUpdate(BaseModel):
+    module_ids: List[str]
 
 
 class FeatureResponse(FeatureBase):
@@ -78,6 +92,17 @@ class ResponsibilityFieldBase(BaseModel):
 
 class ResponsibilityFieldCreate(ResponsibilityFieldBase):
     feature_ids: List[str] = []
+
+
+class ResponsibilityFieldUpdate(BaseModel):
+    name: Optional[str] = None
+    group_id: Optional[str] = None
+    owner_id: Optional[str] = None
+    backup_owner_id: Optional[str] = None
+
+
+class FieldFeaturesUpdate(BaseModel):
+    feature_ids: List[str]
 
 
 class ResponsibilityFieldResponse(ResponsibilityFieldBase):

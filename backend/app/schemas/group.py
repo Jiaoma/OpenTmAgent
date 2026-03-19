@@ -56,6 +56,10 @@ class GroupUpdate(BaseModel):
     member_ids: Optional[List[str]] = None
 
 
+class GroupMembersUpdate(BaseModel):
+    person_ids: List[str]
+
+
 class GroupResponse(GroupBase):
     id: str
     created_at: datetime

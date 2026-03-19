@@ -24,7 +24,7 @@
           <el-input v-model="form.employee_id" />
         </el-form-item>
         <el-form-item label="邮箱">
-          <el-input v-model="form.email" />
+          <el-input v-model="form.email" placeholder="请输入有效邮箱地址" />
         </el-form-item>
         <el-form-item label="职位">
           <el-input v-model="form.position" />
@@ -53,6 +53,11 @@ const loadPersons = async () => {
 }
 
 const createPerson = async () => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(form.value.email)) {
+    ElMessage.error('请输入有效的邮箱地址')
+    return
+  }
   try {
     await axios.post('/api/v1/persons', form.value)
     ElMessage.success('创建成功')

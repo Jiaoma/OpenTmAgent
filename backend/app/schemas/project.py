@@ -26,6 +26,13 @@ class VersionCreate(VersionBase):
     pass
 
 
+class VersionUpdate(BaseModel):
+    name: Optional[str] = None
+    project_manager: Optional[str] = None
+    software_manager: Optional[str] = None
+    test_manager: Optional[str] = None
+
+
 class VersionResponse(VersionBase):
     id: str
     created_at: datetime
@@ -47,6 +54,12 @@ class IterationBase(BaseModel):
 
 class IterationCreate(IterationBase):
     version_id: str
+
+
+class IterationUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
 
 
 class IterationResponse(IterationBase):

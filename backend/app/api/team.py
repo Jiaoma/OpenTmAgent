@@ -6,11 +6,11 @@ from app.models.base import get_db
 from app.models import Person, AbilityDimension, PersonAbilityModel, Group, KeyPerson, KeyPersonType, TaskPerson
 from app.schemas import (
     PersonCreate, PersonUpdate, PersonResponse, PersonDetailResponse,
-    AbilityDimensionCreate, AbilityDimensionResponse,
+    AbilityDimensionCreate, AbilityDimensionUpdate, AbilityDimensionResponse,
     PersonAbilityModelCreate, AbilityRadarData,
-    GroupCreate, GroupUpdate, GroupResponse, GroupDetailResponse,
+    GroupCreate, GroupUpdate, GroupMembersUpdate, GroupResponse, GroupDetailResponse,
     GroupLoadResponse, GroupLoadCurveResponse, LoadCurvePoint,
-    KeyPersonTypeCreate, KeyPersonTypeResponse
+    KeyPersonTypeCreate, KeyPersonTypeResponse, KeyPersonCreate
 )
 
 router = APIRouter()
@@ -34,8 +34,25 @@ async def create_person(person: PersonCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/persons", response_model=List[PersonResponse])
-async def list_persons(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    persons = db.query(Person).offset(skip).limit(limit).all()
+async def list_persons(
+    skip: int = 0, 
+    limit: int = 100,
+    search: str = None,
+    group_id: str = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Person)
+    
+    if search:
+        query = query.filter(
+            (Person.name.ilike(f"%{search}%")) |
+            (Person.employee_id.ilike(f"%{search}%"))
+        )
+    
+    if group_id:
+        query = query.filter(Person.group_id == group_id)
+    
+    persons = query.offset(skip).limit(limit).all()
     return persons
 
 
@@ -104,6 +121,25 @@ async def create_ability_dimension(dimension: AbilityDimensionCreate, db: Sessio
 @router.get("/ability-dimensions", response_model=List[AbilityDimensionResponse])
 async def list_ability_dimensions(db: Session = Depends(get_db)):
     return db.query(AbilityDimension).all()
+
+
+@router.put("/ability-dimensions/{dimension_id}", response_model=AbilityDimensionResponse)
+async def update_ability_dimension(
+    dimension_id: str,
+    dimension: AbilityDimensionUpdate,
+    db: Session = Depends(get_db)
+):
+    db_dimension = db.query(AbilityDimension).filter(AbilityDimension.id == dimension_id).first()
+    if not db_dimension:
+        raise HTTPException(status_code=404, detail="能力维度不存在")
+    
+    update_data = dimension.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_dimension, key, value)
+    
+    db.commit()
+    db.refresh(db_dimension)
+    return db_dimension
 
 
 @router.put("/persons/{person_id}/ability-model")
@@ -191,6 +227,26 @@ async def list_groups(db: Session = Depends(get_db)):
     return db.query(Group).all()
 
 
+@router.put("/groups/{group_id}", response_model=GroupResponse)
+async def update_group(
+    group_id: str,
+    group: GroupUpdate,
+    db: Session = Depends(get_db)
+):
+    db_group = db.query(Group).filter(Group.id == group_id).first()
+    if not db_group:
+        raise HTTPException(status_code=404, detail="小组不存在")
+    
+    update_data = group.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        if key != "member_ids":
+            setattr(db_group, key, value)
+    
+    db.commit()
+    db.refresh(db_group)
+    return db_group
+
+
 @router.get("/groups/{group_id}", response_model=GroupDetailResponse)
 async def get_group(group_id: str, db: Session = Depends(get_db)):
     group = db.query(Group).filter(Group.id == group_id).first()
@@ -273,3 +329,80 @@ async def create_key_person_type(kpt: KeyPersonTypeCreate, db: Session = Depends
 @router.get("/key-person-types", response_model=List[KeyPersonTypeResponse])
 async def list_key_person_types(db: Session = Depends(get_db)):
     return db.query(KeyPersonType).all()
+
+
+@router.post("/groups/{group_id}/members")
+async def add_group_members(
+    group_id: str,
+    members: GroupMembersUpdate,
+    db: Session = Depends(get_db)
+):
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="小组不存在")
+    
+    for person_id in members.person_ids:
+        person = db.query(Person).filter(Person.id == person_id).first()
+        if person:
+            person.group_id = group_id
+    
+    db.commit()
+    return {"message": f"已添加 {len(members.person_ids)} 名成员"}
+
+
+@router.delete("/groups/{group_id}/members/{person_id}")
+async def remove_group_member(
+    group_id: str,
+    person_id: str,
+    db: Session = Depends(get_db)
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="人员不存在")
+    
+    if person.group_id != group_id:
+        raise HTTPException(status_code=400, detail="该人员不在此小组中")
+    
+    person.group_id = None
+    db.commit()
+    return {"message": "已移除成员"}
+
+
+@router.post("/groups/{group_id}/key-persons")
+async def add_key_person(
+    group_id: str,
+    key_person: KeyPersonCreate,
+    db: Session = Depends(get_db)
+):
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="小组不存在")
+    
+    db_kp = KeyPerson(
+        group_id=group_id,
+        type_id=key_person.type_id,
+        person_id=key_person.person_id
+    )
+    db.add(db_kp)
+    db.commit()
+    db.refresh(db_kp)
+    return {"id": db_kp.id, "message": "已添加关键人物"}
+
+
+@router.delete("/groups/{group_id}/key-persons/{kp_id}")
+async def remove_key_person(
+    group_id: str,
+    kp_id: str,
+    db: Session = Depends(get_db)
+):
+    kp = db.query(KeyPerson).filter(
+        KeyPerson.id == kp_id,
+        KeyPerson.group_id == group_id
+    ).first()
+    
+    if not kp:
+        raise HTTPException(status_code=404, detail="关键人物不存在")
+    
+    db.delete(kp)
+    db.commit()
+    return {"message": "已移除关键人物"}

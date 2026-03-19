@@ -1,0 +1,16 @@
+*.local
+*.pyc
+__pycache__/
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+.env
+*.env
+*.db

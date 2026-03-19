@@ -38,6 +38,7 @@ class OpenTmAgentCLI:
             "update": self.cmd_update,
             "delete": self.cmd_delete,
             "export": self.cmd_export,
+            "show": self.cmd_show,
         }
 
         self.sub_commands = {
@@ -193,8 +194,138 @@ OpenTmAgent CLI - 企业级项目管理和团队管理平台
         obj_type = args[0]
         if obj_type in self.sub_commands:
             self.sub_commands[obj_type]("export", args[1:])
+        elif obj_type == "task-graph":
+            self.export_task_graph(args[1:])
+        elif obj_type == "gantt":
+            self.export_gantt(args[1:])
         else:
             print(f"未知类型: {obj_type}")
+
+    def cmd_show(self, args):
+        if len(args) < 2:
+            print("用法: show <task-graph|gantt> <iteration_id>")
+            return
+        
+        cmd = args[0]
+        iteration_id = args[1]
+        
+        if cmd == "task-graph":
+            self.show_task_graph(iteration_id)
+        elif cmd == "gantt":
+            self.show_gantt(iteration_id)
+        else:
+            print(f"未知命令: {cmd}")
+            print("可用命令: task-graph, gantt")
+
+    def show_task_graph(self, iteration_id):
+        try:
+            response = requests.get(
+                f"{self.base_url}/tasks/graph/mermaid",
+                params={"iteration_ids": iteration_id}
+            )
+            
+            if response.status_code == 200:
+                mermaid_code = response.json()["mermaid_code"]
+                print("\n" + "=" * 70)
+                print("任务依赖关系图 (Mermaid)")
+                print("=" * 70)
+                print(mermaid_code)
+                print("=" * 70)
+                print("\n提示: 可将上述代码复制到支持Mermaid的编辑器中查看")
+                print("推荐工具: https://mermaid.live/ 或 VS Code Mermaid插件")
+            else:
+                error = response.json().get('detail', '未知错误')
+                print(f"错误: {error}")
+        except Exception as e:
+            print(f"请求失败: {e}")
+
+    def show_gantt(self, iteration_id):
+        try:
+            response = requests.get(
+                f"{self.base_url}/tasks/gantt/mermaid",
+                params={"iteration_id": iteration_id}
+            )
+            
+            if response.status_code == 200:
+                mermaid_code = response.json()["mermaid_code"]
+                print("\n" + "=" * 70)
+                print("任务甘特图 (Mermaid)")
+                print("=" * 70)
+                print(mermaid_code)
+                print("=" * 70)
+                print("\n提示: 可将上述代码复制到支持Mermaid的编辑器中查看")
+                print("推荐工具: https://mermaid.live/ 或 VS Code Mermaid插件")
+            else:
+                error = response.json().get('detail', '未知错误')
+                print(f"错误: {error}")
+        except Exception as e:
+            print(f"请求失败: {e}")
+
+    def export_task_graph(self, args):
+        if len(args) < 1:
+            print("用法: export task-graph <iteration_id> [--file filename]")
+            return
+        
+        iteration_id = args[0]
+        filename = "task_graph.md"
+        
+        if "--file" in args:
+            idx = args.index("--file")
+            if idx + 1 < len(args):
+                filename = args[idx + 1]
+        
+        try:
+            response = requests.get(
+                f"{self.base_url}/tasks/graph/mermaid",
+                params={"iteration_ids": iteration_id}
+            )
+            
+            if response.status_code == 200:
+                mermaid_code = response.json()["mermaid_code"]
+                content = f"# 任务依赖关系图\n\n```mermaid\n{mermaid_code}\n```\n"
+                
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                print(f"✓ 已导出到: {filename}")
+            else:
+                error = response.json().get('detail', '未知错误')
+                print(f"错误: {error}")
+        except Exception as e:
+            print(f"导出失败: {e}")
+
+    def export_gantt(self, args):
+        if len(args) < 1:
+            print("用法: export gantt <iteration_id> [--file filename]")
+            return
+        
+        iteration_id = args[0]
+        filename = "gantt.md"
+        
+        if "--file" in args:
+            idx = args.index("--file")
+            if idx + 1 < len(args):
+                filename = args[idx + 1]
+        
+        try:
+            response = requests.get(
+                f"{self.base_url}/tasks/gantt/mermaid",
+                params={"iteration_id": iteration_id}
+            )
+            
+            if response.status_code == 200:
+                mermaid_code = response.json()["mermaid_code"]
+                content = f"# 任务甘特图\n\n```mermaid\n{mermaid_code}\n```\n"
+                
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                print(f"✓ 已导出到: {filename}")
+            else:
+                error = response.json().get('detail', '未知错误')
+                print(f"错误: {error}")
+        except Exception as e:
+            print(f"导出失败: {e}")
 
     def handle_person(self, action, args):
         if action == "add":

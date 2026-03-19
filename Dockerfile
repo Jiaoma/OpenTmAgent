@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 RUN pip install prompt-toolkit requests
 
@@ -16,7 +16,7 @@ COPY cli/ ./cli/
 
 RUN mkdir -p data logs
 
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/backend
 ENV DATABASE_URL=sqlite:///data/opentmagent.db
 
 EXPOSE 8000

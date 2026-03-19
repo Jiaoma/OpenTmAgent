@@ -1,14 +1,17 @@
-version: '3.8'
-
 services:
   opentmagent:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.local
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./backend:/app/backend
+      - ./cli:/app/cli
     environment:
+      - PYTHONPATH=/app:/app/backend
       - DATABASE_URL=sqlite:///data/opentmagent.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
