@@ -67,6 +67,12 @@ docker-compose logs -f
 # Web界面: http://localhost
 # API文档: http://localhost:8000/docs
 # 健康检查: http://localhost/health
+
+# 7. 停止服务
+docker-compose down              # 停止并删除容器
+docker-compose stop              # 仅停止容器（保留数据）
+docker-compose down -v           # 停止并删除容器和数据卷（清空数据库）
+docker-compose ps                # 查看运行状态
 ```
 
 ### 方式二：本地开发
@@ -117,6 +123,10 @@ npm run build
 
 前端启动后访问: http://localhost:3000
 
+停止服务：
+- 后端: 按 `Ctrl+C` 停止 uvicorn 进程
+- 前端: 按 `Ctrl+C` 停止 vite 开发服务器
+
 #### 3. CLI启动
 
 ```bash
@@ -140,7 +150,10 @@ OpenTmAgent> add person                    # 添加人员
 OpenTmAgent> list groups                   # 查看小组列表
 OpenTmAgent> list versions                 # 查看版本列表
 OpenTmAgent> export modules                # 导出模块Mermaid图
-OpenTmAgent> exit                           # 退出
+OpenTmAgent> show task-graph <iteration_id>  # 显示任务依赖图
+OpenTmAgent> show gantt <iteration_id>       # 显示甘特图
+OpenTmAgent> export task-graph <id> --file <filename>  # 导出任务图
+OpenTmAgent> exit                           # 退出CLI
 ```
 
 #### 4. Telegram Bot启动
